@@ -279,7 +279,7 @@ class TopTokens:
                             # para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 255)
                     else:
                         print(terminal)
-                        para.add_run(f" {terminal}").font.color.rgb = RGBColor(255, 191, 0)
+                        para.add_run(f" {terminal}").font.color.rgb = RGBColor(211, 211, 211)
                 para.add_run('\n')
 
             if not os.path.isdir(f"{self.output_dir}/annotated_docs"):
