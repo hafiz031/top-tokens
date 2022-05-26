@@ -1,0 +1,4 @@
+venv/*
+*.log
+intent-sample/*
+outputs/*
