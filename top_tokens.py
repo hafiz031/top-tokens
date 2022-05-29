@@ -1,6 +1,7 @@
 from collections import defaultdict
 from collections import Counter
-from re import S
+from re import S, template
+from numpy import take
 import pandas as pd
 import os
 import json
@@ -270,22 +271,34 @@ class TopTokens:
 
             doc = docx.Document()
             para = doc.add_paragraph('')
+            marked_set = set()
 
             for example in intended_examples.iloc:
                 example = bp.do_basic_preprocessing(text = example, remove_predefined_stopwords = False)
                 # Not considering bigram and higher grams for now
                 splitted_example = str(example).split()
                 for terminal in splitted_example:
+                    mark_it = True
+                    if ANNOTATE_FIRST_OCCURRENCE_ONLY:
+                        if terminal not in marked_set:
+                            marked_set.add(terminal)
+                            # print(terminal)
+                        else:
+                            mark_it = False
+
                     if terminal in intended_token_priorities.keys():
                         if terminal in basic_preprocessing.predefined_stopwords:
-                            # print(change_range(intended_token_priorities[terminal]))
-                            para.add_run(f" {terminal}").font.color.rgb = RGBColor(change_range(intended_token_priorities[terminal]), 0, 0)
-                            # para.add_run(f" {terminal}").font.color.rgb = RGBColor(255, 0, 0)
+                            if mark_it:
+                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(change_range(intended_token_priorities[terminal]), 0, 0)
+                            else:
+                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 0)
                         else:
-                            para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, change_range(intended_token_priorities[terminal]))
-                            # para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 255)
+                            if mark_it:
+                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, change_range(intended_token_priorities[terminal]))
+                            else:
+                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 0)
                     else:
-                        print(terminal)
+                        # print(terminal)
                         para.add_run(f" {terminal}").font.color.rgb = RGBColor(211, 211, 211)
                 para.add_run('\n')
 
