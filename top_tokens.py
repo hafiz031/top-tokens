@@ -11,6 +11,7 @@ from docx.enum.text import WD_COLOR_INDEX
 from docx.shared import RGBColor
 from basic_preprocessing import BasicPreprocessor
 from get_corpus_n_knowledgebase import GetCorpusKB
+from classwise_tfidf import ClasswiseTFIDF
 from config import *
 
 bp = BasicPreprocessor()
@@ -128,6 +129,9 @@ class TopTokens:
         iwtc_div_total_tokens = {k: {_k: _v / self.total_terminals for _k, _v in v.items()} for k, v in iwtc.items()}
         tppi = self.token_probability_per_intent() # Denominator
 
+        if not os.path.isdir(f"{self.output_dir}/intentwise_token_probabilities"):
+            os.makedirs(f"{self.output_dir}/intentwise_token_probabilities")
+
         for intent in self.intents:
             numerator = iwtc_div_total_tokens[intent]
             denominator = tppi[intent]
@@ -137,8 +141,6 @@ class TopTokens:
             else:
                 proba = {k: v for k, v in sorted(proba.items(), key=lambda item: item[1], reverse = True)}
 
-            if not os.path.isdir(f"{self.output_dir}/intentwise_token_probabilities"):
-                os.makedirs(f"{self.output_dir}/intentwise_token_probabilities")
             with open(f"{self.output_dir}/intentwise_token_probabilities/{''.join(intent.split('.')[:-1])}.json", "w") as jf:
                 json.dump(proba, jf, ensure_ascii=False)
             # with open(f"{self.output_dir}/intentwise_token_probabilities/{''.join(intent.split('.')[:-1])}.txt", "w") as f:
@@ -251,16 +253,20 @@ class TopTokens:
         for intent in intents:
             intended_examples = df[df["intent"] == intent]["sample_text"]
 
-            with open(f"outputs/intentwise_token_probabilities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
-                intended_token_probabilities = json.load(jf)
+            if ALGORITHM == "bayesian":
+                with open(f"outputs/intentwise_token_probabilities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
+                    intended_token_priorities = json.load(jf)
+            elif ALGORITHM == "ctfidf":
+                with open(f"outputs/intentwise_token_tfidf_priorities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
+                    intended_token_priorities = json.load(jf)                
 
             if apply_min_max_normalization:
                 # For better visualization, as the probabilities are too small for each of
                 # the tokens, hence, it is hard to distinguish them while viewing if we do not normalize them.
-                probabilities = intended_token_probabilities.values()
+                probabilities = intended_token_priorities.values()
                 mini = min(probabilities)
                 maxm = max(probabilities)
-                intended_token_probabilities = {k: (v - mini) / (maxm - mini) for k, v in intended_token_probabilities.items()}
+                intended_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in intended_token_priorities.items()}
 
             doc = docx.Document()
             para = doc.add_paragraph('')
@@ -270,13 +276,13 @@ class TopTokens:
                 # Not considering bigram and higher grams for now
                 splitted_example = str(example).split()
                 for terminal in splitted_example:
-                    if terminal in intended_token_probabilities.keys():
+                    if terminal in intended_token_priorities.keys():
                         if terminal in basic_preprocessing.predefined_stopwords:
-                            # print(change_range(intended_token_probabilities[terminal]))
-                            para.add_run(f" {terminal}").font.color.rgb = RGBColor(change_range(intended_token_probabilities[terminal]), 0, 0)
+                            # print(change_range(intended_token_priorities[terminal]))
+                            para.add_run(f" {terminal}").font.color.rgb = RGBColor(change_range(intended_token_priorities[terminal]), 0, 0)
                             # para.add_run(f" {terminal}").font.color.rgb = RGBColor(255, 0, 0)
                         else:
-                            para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, change_range(intended_token_probabilities[terminal]))
+                            para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, change_range(intended_token_priorities[terminal]))
                             # para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 255)
                     else:
                         print(terminal)
@@ -293,12 +299,16 @@ class TopTokens:
 
 if __name__ == "__main__":
     tt = TopTokens(input_dir = "intent-sample")
-    # print(tt.get_vocabulary_counter()[:100])
-    # print(tt.get_vocabulary_counter()[:100])
-    tt.intentwise_each_token_count()
-    # tt.probability_of_token_given_intent(take_positive_probabilities_only = False)
-    tt.probability_of_token_given_intent(take_positive_probabilities_only = True)
-    # tt.generate_data_not_containing_top_tokens()
-    tt.find_unique_tokens()
+
+    if ALGORITHM == "bayesian":
+        tt.intentwise_each_token_count()
+        # tt.probability_of_token_given_intent(take_positive_probabilities_only = False)
+        tt.probability_of_token_given_intent(take_positive_probabilities_only = True)
+        # tt.generate_data_not_containing_top_tokens()
+        tt.find_unique_tokens()
+
+    elif ALGORITHM == "ctfidf":
+        ctfidf = ClasswiseTFIDF(input_dir = "intent-sample")
+        ctfidf.dump_intentwise_token_tfidf_priorities()
     
     tt.generate_annotated_output()
