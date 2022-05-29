@@ -10,10 +10,10 @@ import docx
 from docx.enum.text import WD_COLOR_INDEX
 from docx.shared import RGBColor
 from basic_preprocessing import BasicPreprocessor
+from get_corpus_n_knowledgebase import GetCorpusKB
 from config import *
 
 bp = BasicPreprocessor()
-
 
 class TopTokens:
     def __init__(self, input_dir, output_dir = "outputs"):
@@ -23,25 +23,26 @@ class TopTokens:
         self.vocabulary = []
         self.total_terminals = None
         self.output_dir = output_dir
+        self.gckb = GetCorpusKB(self.input_dir)
 
 
-    def all_CSVs_to_df(self, extension = '.csv'): # Non default argument dump_dir must be before default arguments
-        dfs = []
-        try:
-            for subdir, dirs, files in os.walk(self.input_dir): # os.walk() requires folder not file
-                for filename in files:
-                    ext = os.path.splitext(filename)[-1].lower()
-                    if ext == extension:
-                        input_file_dir = os.path.join(subdir, filename)
-                        try:
-                            df = pd.read_csv(input_file_dir, header = None)
-                        except:
-                            logging.error("Cannot read knowledgebase for language detection")
+    # def all_CSVs_to_df(self, extension = '.csv'): # Non default argument dump_dir must be before default arguments
+    #     dfs = []
+    #     try:
+    #         for subdir, dirs, files in os.walk(self.input_dir): # os.walk() requires folder not file
+    #             for filename in files:
+    #                 ext = os.path.splitext(filename)[-1].lower()
+    #                 if ext == extension:
+    #                     input_file_dir = os.path.join(subdir, filename)
+    #                     try:
+    #                         df = pd.read_csv(input_file_dir, header = None)
+    #                     except:
+    #                         logging.error("Cannot read knowledgebase for language detection")
 
-                        dfs.append(pd.DataFrame({"sample_text": df.iloc[:, 0], "intent": filename}))
-            return pd.concat(dfs)
-        except Exception as e:
-            logging.error(e)
+    #                     dfs.append(pd.DataFrame({"sample_text": df.iloc[:, 0], "intent": filename}))
+    #         return pd.concat(dfs)
+    #     except Exception as e:
+    #         logging.error(e)
 
 
     def tokenizer(self, example, ngram = TOKENIZATION_RANGE):
@@ -61,7 +62,7 @@ class TopTokens:
 
     def get_vocabulary_counter(self):
         if self.vocabulary == []:
-            df = self.all_CSVs_to_df()
+            df = self.gckb.all_CSVs_to_df()
             examples = list(df["sample_text"])
             _terminals = []
 
@@ -82,7 +83,7 @@ class TopTokens:
     def intentwise_each_token_count(self):
         if self.intent_each_token_count == {}:
             intentwise_token_count = {}
-            df = self.all_CSVs_to_df()
+            df = self.gckb.all_CSVs_to_df()
             if self.intents == []:
                 intents = list(set(df["intent"]))
                 intents.sort()
@@ -203,7 +204,7 @@ class TopTokens:
 
 
     def generate_data_not_containing_top_tokens(self):
-        df = self.all_CSVs_to_df()
+        df = self.gckb.all_CSVs_to_df()
         if self.intents == []:
                 intents = list(set(df["intent"]))
                 intents.sort()
@@ -241,7 +242,7 @@ class TopTokens:
         else:
             logging.error("No predefined stopwords found. Please make sure there is a csv file containing stopwords.")
         
-        df = self.all_CSVs_to_df()
+        df = self.gckb.all_CSVs_to_df()
         intents = set(df["intent"])
 
         def change_range(old_value, old_mini = 0, old_max = 1, new_mini = 0, new_max = 255):
