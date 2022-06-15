@@ -13,7 +13,9 @@ from docx.shared import RGBColor
 from basic_preprocessing import BasicPreprocessor
 from get_corpus_n_knowledgebase import GetCorpusKB
 from classwise_tfidf import ClasswiseTFIDF
+import pickle
 from config import *
+from tfidf import TFIDF
 
 bp = BasicPreprocessor()
 
@@ -234,9 +236,6 @@ class TopTokens:
             pd.DataFrame(quarantined).to_csv(f"quarantined/{intent}.csv", index = False)
 
     
-
-
-    
     def generate_annotated_output(self, apply_min_max_normalization = True):
         """documentwise_token_priorities: for intentwise algorithms each of the document contains all
         the examples of under a certain document, but for examplewise algorithm like tfidf (regular version)
@@ -259,31 +258,58 @@ class TopTokens:
             intended_examples = df[df["intent"] == intent]["sample_text"]
 
             if ALGORITHM == "bayesian":
-                with open(f"outputs/intentwise_token_probabilities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
+                with open(f"{self.output_dir}/intentwise_token_probabilities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
                     documentwise_token_priorities = json.load(jf)
             elif ALGORITHM == "ctfidf":
-                with open(f"outputs/intentwise_token_tfidf_priorities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
-                    documentwise_token_priorities = json.load(jf)                
+                with open(f"{self.output_dir}/intentwise_token_tfidf_priorities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
+                    documentwise_token_priorities = json.load(jf)
+            elif ALGORITHM == "tfidf":
+                # open the tfidf serialized object
+                # also get the minimum and maximum tfidf value across all examples
+                with open(f"{self.output_dir}/tfidf_priorities/vectorizer.pkl", "rb") as f:
+                    tfidf_vectorizer = pickle.load(f)
+                with open(f"{self.output_dir}/tfidf_priorities/global_min_max.json", "r") as jf:
+                    global_min_max = json.load(jf)
+                mini = global_min_max["min"]
+                maxm = global_min_max["max"]
 
-            if apply_min_max_normalization:
-                # For better visualization, as the probabilities are too small for each of
-                # the tokens, hence, it is hard to distinguish them while viewing if we do not normalize them.
-                probabilities = documentwise_token_priorities.values()
-                mini = min(probabilities)
-                maxm = max(probabilities)
-                documentwise_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in documentwise_token_priorities.items()}
+            if ALGORITHM != "tfidf":
+                """As in tfidf the a document is no longer an intent, rather it is just an example.
+                So, the following is not applicable for tfidf."""
+                if apply_min_max_normalization:
+                    # For better visualization, as the probabilities are too small for each of
+                    # the tokens, hence, it is hard to distinguish them while viewing if we do not normalize them.
+                    probabilities = documentwise_token_priorities.values()
+                    mini = min(probabilities)
+                    maxm = max(probabilities)
+                    documentwise_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in documentwise_token_priorities.items()}
 
             doc = docx.Document()
             para = doc.add_paragraph('')
             marked_set = set()
 
             for example in intended_examples.iloc:
+                
+                if ALGORITHM == "tfidf":
+                    documentwise_token_priorities = dict(zip(tfidf_vectorizer.get_feature_names(), tfidf_vectorizer.transform([example]).toarray()[0]))
+                    if apply_min_max_normalization:
+                        # For better visualization, as the probabilities are too small for each of
+                        # the tokens, hence, it is hard to distinguish them while viewing if we do not normalize them.
+                        probabilities = documentwise_token_priorities.values()
+                        documentwise_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in documentwise_token_priorities.items()}
+
                 example = bp.do_basic_preprocessing(text = example, remove_predefined_stopwords = False)
                 # Not considering bigram and higher grams for now
                 splitted_example = str(example).split()
                 for terminal in splitted_example:
                     mark_it = True
                     if ANNOTATE_FIRST_OCCURRENCE_ONLY:
+                        """INFO: It is not too much useful for tfidf (when we take document examplewise).
+                        As the same token from different examples will not necessarily have the same tfidf 
+                        value. So, the duplicate concept is only applicable under the same example text.
+                        As it is not too common for a token to occur multiple times in a single sentence, so,
+                        this feature is not too much useful in this case.
+                        """
                         if terminal not in marked_set:
                             marked_set.add(terminal)
                             # print(terminal)
@@ -328,4 +354,8 @@ if __name__ == "__main__":
         ctfidf = ClasswiseTFIDF(input_dir = "intent-sample")
         ctfidf.dump_intentwise_token_tfidf_priorities()
     
+    elif ALGORITHM == "tfidf":
+        tfidf = TFIDF(input_dir = "intent-sample")
+        tfidf.dump_model_and_metadata()
+
     tt.generate_annotated_output()
