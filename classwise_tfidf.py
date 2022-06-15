@@ -83,5 +83,6 @@ class ClasswiseTFIDF:
                     json.dump(intentwise_priority, jf, ensure_ascii=False)
 
 
-ctfidf = ClasswiseTFIDF(input_dir = "intent-sample")
-ctfidf.dump_intentwise_token_tfidf_priorities()
+if __name__ == "__main__":
+    ctfidf = ClasswiseTFIDF(input_dir = "intent-sample")
+    ctfidf.dump_intentwise_token_tfidf_priorities()
