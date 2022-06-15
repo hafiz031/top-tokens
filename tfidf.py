@@ -11,6 +11,7 @@ import pickle
 import json
 from config import SMOOTH_IDF
 from config import CALCULATE_FOR_EACH_CLASS_SEPARATELY
+from config import USE_SUBLINEAR_TF_SCALING
 import os
 
 class TFIDF:
@@ -60,7 +61,9 @@ class TFIDF:
                 # If we put TfidfVectorizer outside of the loop, it seems to create problems (surprisingly), 
                 # and the tfidf values won't match if we transform the exact same examples
                 # inside generate_annotated_output()
-                vectorizer = TfidfVectorizer(tokenizer = self.tokenizer, smooth_idf = SMOOTH_IDF)
+                vectorizer = TfidfVectorizer(tokenizer = self.tokenizer, 
+                                            smooth_idf = SMOOTH_IDF,
+                                            sublinear_tf = USE_SUBLINEAR_TF_SCALING)
                 X = vectorizer.fit_transform(corpus[intent])
                 vectorizers[intent] = vectorizer
                 min_maxes[intent] = {"min": np.min(X), "max": np.max(X)}
