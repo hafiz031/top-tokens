@@ -238,6 +238,10 @@ class TopTokens:
 
     
     def generate_annotated_output(self, apply_min_max_normalization = True):
+        """documentwise_token_priorities: for intentwise algorithms each of the document contains all
+        the examples of under a certain document, but for examplewise algorithm like tfidf (regular version)
+        each of the documents are each of the examples.
+        """
         basic_preprocessing.load_stopwords(force_loading = True)
 
         if basic_preprocessing.predefined_stopwords:
@@ -256,18 +260,18 @@ class TopTokens:
 
             if ALGORITHM == "bayesian":
                 with open(f"outputs/intentwise_token_probabilities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
-                    intended_token_priorities = json.load(jf)
+                    documentwise_token_priorities = json.load(jf)
             elif ALGORITHM == "ctfidf":
                 with open(f"outputs/intentwise_token_tfidf_priorities/{'.'.join(intent.split('.')[:-1])}.json") as jf:
-                    intended_token_priorities = json.load(jf)                
+                    documentwise_token_priorities = json.load(jf)                
 
             if apply_min_max_normalization:
                 # For better visualization, as the probabilities are too small for each of
                 # the tokens, hence, it is hard to distinguish them while viewing if we do not normalize them.
-                probabilities = intended_token_priorities.values()
+                probabilities = documentwise_token_priorities.values()
                 mini = min(probabilities)
                 maxm = max(probabilities)
-                intended_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in intended_token_priorities.items()}
+                documentwise_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in documentwise_token_priorities.items()}
 
             doc = docx.Document()
             para = doc.add_paragraph('')
@@ -286,15 +290,15 @@ class TopTokens:
                         else:
                             mark_it = False
 
-                    if terminal in intended_token_priorities.keys():
+                    if terminal in documentwise_token_priorities.keys():
                         if terminal in basic_preprocessing.predefined_stopwords:
                             if mark_it:
-                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(change_range(intended_token_priorities[terminal]), 0, 0)
+                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(change_range(documentwise_token_priorities[terminal]), 0, 0)
                             else:
                                 para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 0)
                         else:
                             if mark_it:
-                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, change_range(intended_token_priorities[terminal]))
+                                para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, change_range(documentwise_token_priorities[terminal]))
                             else:
                                 para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 0)
                     else:
