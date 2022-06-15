@@ -254,6 +254,12 @@ class TopTokens:
         def change_range(old_value, old_mini = 0, old_max = 1, new_mini = 0, new_max = 255):
             return int(((old_value - old_mini) / (old_max - old_mini)) * (new_max - new_mini) + new_mini)
         
+        if ALGORITHM == "tfidf":
+            with open(f"{self.output_dir}/tfidf_priorities/vectorizer.pkl", "rb") as f:
+                tfidf_vectorizer = pickle.load(f)
+            with open(f"{self.output_dir}/tfidf_priorities/global_min_max.json", "r") as jf:
+                global_min_max = json.load(jf)
+
         for intent in intents:
             intended_examples = df[df["intent"] == intent]["sample_text"]
 
@@ -266,12 +272,16 @@ class TopTokens:
             elif ALGORITHM == "tfidf":
                 # open the tfidf serialized object
                 # also get the minimum and maximum tfidf value across all examples
-                with open(f"{self.output_dir}/tfidf_priorities/vectorizer.pkl", "rb") as f:
-                    tfidf_vectorizer = pickle.load(f)
-                with open(f"{self.output_dir}/tfidf_priorities/global_min_max.json", "r") as jf:
-                    global_min_max = json.load(jf)
-                mini = global_min_max["min"]
-                maxm = global_min_max["max"]
+                # with open(f"{self.output_dir}/tfidf_priorities/vectorizer.pkl", "rb") as f:
+                #     tfidf_vectorizer = pickle.load(f)
+                # with open(f"{self.output_dir}/tfidf_priorities/global_min_max.json", "r") as jf:
+                #     global_min_max = json.load(jf)
+                if CALCULATE_FOR_EACH_CLASS_SEPARATELY:
+                    mini = global_min_max[intent]["min"]
+                    maxm = global_min_max[intent]["max"]
+                else:
+                    mini = global_min_max["combined"]["min"]
+                    maxm = global_min_max["combined"]["max"]
 
             if ALGORITHM != "tfidf":
                 """As in tfidf the a document is no longer an intent, rather it is just an example.
@@ -279,9 +289,9 @@ class TopTokens:
                 if apply_min_max_normalization:
                     # For better visualization, as the probabilities are too small for each of
                     # the tokens, hence, it is hard to distinguish them while viewing if we do not normalize them.
-                    probabilities = documentwise_token_priorities.values()
-                    mini = min(probabilities)
-                    maxm = max(probabilities)
+                    priorities = documentwise_token_priorities.values()
+                    mini = min(priorities)
+                    maxm = max(priorities)
                     documentwise_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in documentwise_token_priorities.items()}
 
             doc = docx.Document()
@@ -289,16 +299,20 @@ class TopTokens:
             marked_set = set()
 
             for example in intended_examples.iloc:
-                
+
+                example = bp.do_basic_preprocessing(text = example, remove_predefined_stopwords = False)
+
                 if ALGORITHM == "tfidf":
-                    documentwise_token_priorities = dict(zip(tfidf_vectorizer.get_feature_names(), tfidf_vectorizer.transform([example]).toarray()[0]))
+                    if CALCULATE_FOR_EACH_CLASS_SEPARATELY:
+                        documentwise_token_priorities = dict(zip(tfidf_vectorizer[intent].get_feature_names(), tfidf_vectorizer[intent].transform([example]).toarray()[0]))
+                    else:
+                        documentwise_token_priorities = dict(zip(tfidf_vectorizer["combined"].get_feature_names(), tfidf_vectorizer["combined"].transform([example]).toarray()[0]))
                     if apply_min_max_normalization:
                         # For better visualization, as the probabilities are too small for each of
                         # the tokens, hence, it is hard to distinguish them while viewing if we do not normalize them.
-                        probabilities = documentwise_token_priorities.values()
+                        priorities = documentwise_token_priorities.values()
                         documentwise_token_priorities = {k: (v - mini) / (maxm - mini) for k, v in documentwise_token_priorities.items()}
 
-                example = bp.do_basic_preprocessing(text = example, remove_predefined_stopwords = False)
                 # Not considering bigram and higher grams for now
                 splitted_example = str(example).split()
                 for terminal in splitted_example:
@@ -312,7 +326,6 @@ class TopTokens:
                         """
                         if terminal not in marked_set:
                             marked_set.add(terminal)
-                            # print(terminal)
                         else:
                             mark_it = False
 
@@ -328,7 +341,6 @@ class TopTokens:
                             else:
                                 para.add_run(f" {terminal}").font.color.rgb = RGBColor(0, 0, 0)
                     else:
-                        # print(terminal)
                         para.add_run(f" {terminal}").font.color.rgb = RGBColor(211, 211, 211)
                 para.add_run('\n')
 
