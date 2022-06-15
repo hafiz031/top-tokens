@@ -69,6 +69,9 @@ class TFIDF:
                 min_maxes[intent] = {"min": np.min(X), "max": np.max(X)}
             return vectorizers, min_maxes
         else:
+            vectorizer = TfidfVectorizer(tokenizer = self.tokenizer, 
+                                        smooth_idf = SMOOTH_IDF,
+                                        sublinear_tf = USE_SUBLINEAR_TF_SCALING)
             X = vectorizer.fit_transform(corpus["combined"])
             return {"combined": vectorizer}, {"combined": {"min": np.min(X), "max": np.max(X)}}
 
