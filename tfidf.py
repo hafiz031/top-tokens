@@ -1,3 +1,4 @@
+from distutils.command.config import config
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -8,6 +9,7 @@ from get_corpus_n_knowledgebase import GetCorpusKB
 from basic_preprocessing import BasicPreprocessor
 import pickle
 import json
+from config import SMOOTH_IDF
 import os
 
 class TFIDF:
@@ -33,7 +35,7 @@ class TFIDF:
 
     def gen_ctfidf_matrix(self):
         corpus = self.transform_data()
-        vectorizer = TfidfVectorizer(tokenizer = self.tokenizer)
+        vectorizer = TfidfVectorizer(tokenizer = self.tokenizer, smooth_idf = SMOOTH_IDF)
         X = vectorizer.fit_transform(corpus)
 
         return vectorizer, {"min": np.min(X), "max": np.max(X)}
